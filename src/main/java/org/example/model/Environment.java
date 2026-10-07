@@ -22,6 +22,7 @@ public final class Environment {
         position=next; total+=reward; steps++;
         return new Transition(from,next,reward,finished(),drank);
     }
+    public Rewards rewards() { return rewards; }
     public Position position() { return position; }
     public double total() { return total; }
     public int steps() { return steps; }
