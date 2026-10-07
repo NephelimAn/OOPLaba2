@@ -36,6 +36,7 @@ public final class QLearningAgent {
         double[] q=table.get(state(p));
         return q==null?0:q[action.ordinal()];
     }
+    public boolean consumedWater(Position p) { return consumed.contains(p); }
     public int stateCount() { return table.size(); }
 }
 
