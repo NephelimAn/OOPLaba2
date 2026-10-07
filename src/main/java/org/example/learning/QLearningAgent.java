@@ -4,7 +4,7 @@ import java.util.*;
 /** Q-learning state includes consumed water to avoid endlessly farming its reward. */
 public final class QLearningAgent {
     private static final double ALPHA=.25;
-    private static final double GAMMA=.95;
+    private static final double GAMMA=.99;
     private record State(Position position,Set<Position> consumed) { }
     private final Map<State,double[]> table=new HashMap<>();
     private final Random random; private final Set<Position> consumed=new HashSet<>();
@@ -21,11 +21,15 @@ public final class QLearningAgent {
     }
     public void learn(Environment.Transition t,Direction action) {
         double[] previous=values(state(t.from()));
-        if(t.drankWater()) consumed.add(t.to());
+        observe(t);
         double future=t.terminal()?0:Arrays.stream(values(state(t.to()))).max().orElse(0);
         // Slide 9: Qnew(s,a) = Qold(s,a) + alpha * (reward + gamma * max Q(s',a') - Qold(s,a)).
         // Cheese is terminal: its future reward is zero.
         int a=action.ordinal(); previous[a]+=ALPHA*(t.reward()+GAMMA*future-previous[a]);
+    }
+    /** Обновляет память о воде при показе маршрута, не изменяя оценки Q. */
+    public void observe(Environment.Transition transition) {
+        if (transition.drankWater()) consumed.add(transition.to());
     }
     /** Current estimate, useful for inspecting the learner's table. */
     public double qValue(Position p,Direction action) {
@@ -34,3 +38,4 @@ public final class QLearningAgent {
     }
     public int stateCount() { return table.size(); }
 }
+

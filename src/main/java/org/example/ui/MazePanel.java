@@ -12,7 +12,7 @@ public final class MazePanel extends JPanel {
     private Environment environment;
     private int cellSize=34;
     public MazePanel(Consumer<Position> edit) {
-        setBackground(new Color(245,247,250));
+        setBackground(new Color(17,24,39));
         addMouseListener(new MouseAdapter() {
             @Override public void mousePressed(MouseEvent e) {
                 Position p=new Position(e.getY()/cellSize,e.getX()/cellSize);
@@ -34,9 +34,9 @@ public final class MazePanel extends JPanel {
                 g.setColor(switch(type) {
                     case WALL -> new Color(53,65,83); case WATER -> new Color(125,211,252);
                     case SHOCK -> new Color(254,163,163); case START -> new Color(167,243,208);
-                    case CHEESE -> new Color(253,224,71); default -> Color.WHITE;
+                    case CHEESE -> new Color(253,224,71); default -> new Color(203,213,225);
                 });
-                g.fillRect(x,y,cellSize,cellSize); g.setColor(new Color(210,218,228)); g.drawRect(x,y,cellSize,cellSize);
+                g.fillRoundRect(x+1,y+1,cellSize-2,cellSize-2,6,6);
                 String mark=switch(type) { case START -> "S"; case CHEESE -> "C"; case SHOCK -> "!";
                     case WATER -> environment.consumed(p)?"·":"+"; default -> ""; };
                 g.setColor(new Color(40,50,65)); g.setFont(new Font(Font.SANS_SERIF,Font.BOLD,Math.max(12,cellSize/2)));

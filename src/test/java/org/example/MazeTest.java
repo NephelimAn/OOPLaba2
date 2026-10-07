@@ -9,6 +9,32 @@ import java.util.Set;
 import static org.junit.Assert.*;
 
 public class MazeTest {
+    @Test public void trainedStrategyReachesCheeseOnLongDfsCorridors() {
+        for (int seed = 0; seed < 3; seed++) {
+            Maze maze = Maze.generate(12, 16, new Random(seed));
+            Environment environment = new Environment(maze, Rewards.defaults());
+            QLearningAgent agent = new QLearningAgent(new Random(42));
+            for (int episode = 0; episode < 1000; episode++) {
+                environment.reset();
+                agent.resetEpisode();
+                double epsilon = Math.max(.05, .9 * (1.0 - episode / 1000.0));
+                for (int step = 0; step < 1920 && !environment.finished(); step++) {
+                    Direction action = agent.choose(environment.position(), epsilon);
+                    agent.learn(environment.step(action), action);
+                }
+            }
+            environment.reset();
+            agent.resetEpisode();
+            double before = agent.qValue(maze.start(), Direction.UP);
+            for (int step = 0; step < 1920 && !environment.finished(); step++) {
+                Direction action = agent.choose(environment.position(), 0);
+                agent.observe(environment.step(action));
+            }
+            assertTrue("Greedy route must reach cheese for seed " + seed, environment.finished());
+            agent.resetEpisode();
+            assertEquals("Playback must not change Q", before, agent.qValue(maze.start(), Direction.UP), 0);
+        }
+    }
     @Test public void dfsProducesConnectedTreeOfCorridorsOnOddEvenAndLargeBoards() {
         for(int[] size:new int[][]{{2,2},{2,9},{9,2},{12,16},{13,17},{200,200}}) {
             Maze m=Maze.generate(size[0],size[1],new Random(123));
@@ -35,10 +61,10 @@ public class MazeTest {
         agent.learn(new Environment.Transition(next,goal,100,true,false),Direction.RIGHT);
         assertEquals(25,agent.qValue(next,Direction.RIGHT),1e-10);
         agent.learn(new Environment.Transition(s,next,-1,false,false),Direction.UP);
-        double expected=.25*(-1+.95*25);
+        double expected=.25*(-1+.99*25);
         assertEquals(expected,agent.qValue(s,Direction.UP),1e-10);
         agent.learn(new Environment.Transition(s,next,-1,false,false),Direction.UP);
-        assertEquals(expected+.25*(-1+.95*25-expected),agent.qValue(s,Direction.UP),1e-10);
+        assertEquals(expected+.25*(-1+.99*25-expected),agent.qValue(s,Direction.UP),1e-10);
         agent.learn(new Environment.Transition(goal,s,100,true,false),Direction.DOWN);
         assertEquals(25,agent.qValue(goal,Direction.DOWN),1e-10);
     }

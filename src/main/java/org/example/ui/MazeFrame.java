@@ -9,6 +9,11 @@ import java.util.Random;
 
 /** Controller connects independent model, learner and Swing view on the EDT. */
 public final class MazeFrame extends JFrame {
+    private static final Color BACKGROUND = new Color(17,24,39);
+    private static final Color SURFACE = new Color(30,41,59);
+    private static final Color BORDER = new Color(51,65,85);
+    private static final Color TEXT = new Color(226,232,240);
+    private static final Color ACCENT = new Color(129,140,248);
     private Maze maze;
     private Environment environment;
     private QLearningAgent agent;
@@ -29,39 +34,144 @@ public final class MazeFrame extends JFrame {
         super("Мышь в лабиринте — ООП / Q-learning");
         setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
         addWindowListener(new WindowAdapter() { @Override public void windowClosed(WindowEvent e) { stop(); } });
-        JPanel controls=new JPanel(); controls.setLayout(new BoxLayout(controls,BoxLayout.Y_AXIS));
-        controls.setBorder(BorderFactory.createEmptyBorder(12,12,12,12));
-        controls.add(line("Строки",rows,"Столбцы",cols));
-        controls.add(line(button("Сгенерировать",()->newMaze(true)),button("Пустое поле",()->newMaze(false))));
-        controls.add(line("Сыр +Z",cheese,"Вода +x",water,"Ток −y",shock));
-        controls.add(line(button("Применить награды",this::applyRewards),editing,tool));
-        controls.add(line("Эпизоды",episodes,button("Обучить",this::startTraining),button("Стоп",this::stop)));
-        controls.add(line(button("Показать маршрут",this::startPlayback),button("Шаг ИИ",()->{ if(!training.isRunning()) { editing.setSelected(false); autoStep(); } }),button("На старт",this::reset)));
-        JSlider zoom=new JSlider(16,60,34); zoom.setPreferredSize(new Dimension(150,28)); zoom.addChangeListener(e->board.zoom(zoom.getValue()));
-        controls.add(line("Масштаб",zoom,"S: старт   C: сыр   +: вода   !: ток   фиолетовая: мышь"));
-        controls.add(line(stats));
-        JPanel arrows=new JPanel();
-        arrows.add(button("↑",()->manual(Direction.UP))); arrows.add(button("←",()->manual(Direction.LEFT)));
-        arrows.add(button("↓",()->manual(Direction.DOWN))); arrows.add(button("→",()->manual(Direction.RIGHT)));
-        controls.add(arrows);
-        add(controls,BorderLayout.NORTH); add(new JScrollPane(board),BorderLayout.CENTER);
-        log.setEditable(false); log.setFont(new Font(Font.MONOSPACED,Font.PLAIN,12));
-        JPanel bottom=new JPanel(new BorderLayout()); bottom.add(message,BorderLayout.NORTH); bottom.add(new JScrollPane(log),BorderLayout.CENTER);
-        bottom.setBorder(BorderFactory.createEmptyBorder(6,12,12,12)); add(bottom,BorderLayout.SOUTH);
+        // Оформление использует только стандартные панели и границы Swing.
+        JPanel sidebar = new JPanel();
+        sidebar.setLayout(new BoxLayout(sidebar, BoxLayout.Y_AXIS));
+        sidebar.setBackground(BACKGROUND);
+        sidebar.setBorder(BorderFactory.createEmptyBorder(16,16,16,16));
+        JLabel title = new JLabel("Mouse AI");
+        title.setForeground(TEXT);
+        title.setAlignmentX(Component.LEFT_ALIGNMENT);
+        title.setFont(new Font("SansSerif", Font.BOLD, 26));
+        sidebar.add(title);
+        sidebar.add(Box.createVerticalStrut(16));
+        sidebar.add(section("ЛАБИРИНТ",
+                line("Строки",rows,"Столбцы",cols),
+                line(button("Сгенерировать",()->newMaze(true))),
+                line(button("Пустое поле",()->newMaze(false)))));
+        sidebar.add(section("РЕДАКТОР", line(editing), line("Тип клетки",tool)));
+        sidebar.add(section("НАГРАДЫ",
+                line("Сыр +Z",cheese), line("Вода +x",water), line("Ток −y",shock),
+                line(button("Применить награды",this::applyRewards))));
+        sidebar.add(section("ОБУЧЕНИЕ",
+                line("Эпизоды",episodes),
+                line(button("Обучить",this::startTraining),button("Стоп",this::stop)),
+                line(button("Показать маршрут",this::startPlayback)),
+                line(button("Шаг ИИ",()->{ if(!training.isRunning()) { editing.setSelected(false); autoStep(); } }),button("На старт",this::reset)),
+                line(button("↑",()->manual(Direction.UP)),button("←",()->manual(Direction.LEFT)),
+                        button("↓",()->manual(Direction.DOWN)),button("→",()->manual(Direction.RIGHT)))));
+        sidebar.add(Box.createVerticalGlue());
+        JScrollPane sidebarScroll = new JScrollPane(sidebar);
+        sidebarScroll.setPreferredSize(new Dimension(335,600));
+        sidebarScroll.setBorder(BorderFactory.createEmptyBorder());
+
+        JPanel workspace = new JPanel(new BorderLayout(12,12));
+        workspace.setBackground(BACKGROUND);
+        workspace.setBorder(BorderFactory.createEmptyBorder(16,0,16,16));
+        JSlider zoom=new JSlider(16,60,34);
+        zoom.setPreferredSize(new Dimension(140,28));
+        zoom.setBackground(SURFACE);
+        zoom.addChangeListener(e->board.zoom(zoom.getValue()));
+        workspace.add(line("ЛАБИРИНТ", "   Масштаб",zoom),BorderLayout.NORTH);
+        JScrollPane fieldScroll = new JScrollPane(board);
+        fieldScroll.getViewport().setBackground(SURFACE);
+        fieldScroll.setBorder(BorderFactory.createLineBorder(BORDER));
+        workspace.add(fieldScroll,BorderLayout.CENTER);
+
+        log.setEditable(false);
+        log.setFont(new Font(Font.MONOSPACED,Font.PLAIN,12));
+        log.setBackground(SURFACE);
+        log.setForeground(TEXT);
+        log.setCaretColor(TEXT);
+        stats.setForeground(TEXT);
+        message.setForeground(ACCENT);
+        JPanel bottom = new JPanel(new BorderLayout(0,8));
+        bottom.setBackground(BACKGROUND);
+        bottom.add(section("СТАТИСТИКА",line(stats),line(message)),BorderLayout.NORTH);
+        JScrollPane logScroll = new JScrollPane(log);
+        logScroll.setBorder(BorderFactory.createLineBorder(BORDER));
+        bottom.add(logScroll,BorderLayout.CENTER);
+        bottom.add(line("S: старт   C: сыр   +: вода   !: ток"),BorderLayout.SOUTH);
+        workspace.add(bottom,BorderLayout.SOUTH);
+        getContentPane().setBackground(BACKGROUND);
+        add(sidebarScroll,BorderLayout.WEST);
+        add(workspace,BorderLayout.CENTER);
         for(Direction d:Direction.values()) {
             String key=switch(d) { case UP -> "UP"; case DOWN -> "DOWN"; case LEFT -> "LEFT"; case RIGHT -> "RIGHT"; };
             board.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(key),key);
             board.getActionMap().put(key,new AbstractAction() { @Override public void actionPerformed(ActionEvent e) { manual(d); } });
         }
-        newMaze(true); setSize(1050,900); setMinimumSize(new Dimension(900,650)); setLocationRelativeTo(null);
+        newMaze(true); setSize(1180,920); setMinimumSize(new Dimension(900,650)); setLocationRelativeTo(null);
     }
-    private static JSpinner number(int value,int min,int max) { return new JSpinner(new SpinnerNumberModel(value,min,max,1)); }
+    private static JSpinner number(int value, int min, int max) {
+
+        JSpinner spinner = new JSpinner(
+                new SpinnerNumberModel(value, min, max, 1)
+        );
+
+        // Получаем текстовое поле внутри Spinner
+        JSpinner.DefaultEditor editor =
+                (JSpinner.DefaultEditor) spinner.getEditor();
+
+        JFormattedTextField textField =
+                editor.getTextField();
+
+        // Светлый фон
+        textField.setBackground(new Color(241, 245, 249));
+
+        // Тёмный текст
+        textField.setForeground(new Color(30, 41, 59));
+
+        // Цвет выделенного текста
+        textField.setSelectionColor(new Color(203, 213, 225));
+        textField.setSelectedTextColor(new Color(30, 41, 59));
+
+        textField.setCaretColor(new Color(30, 41, 59));
+
+        return spinner;
+    }
+    private static JPanel section(String title, JPanel... rows) {
+        JPanel panel = new JPanel(new GridLayout(0,1,0,4));
+        panel.setBackground(SURFACE);
+        javax.swing.border.TitledBorder border = BorderFactory.createTitledBorder(
+                BorderFactory.createLineBorder(BORDER),title);
+        border.setTitleColor(ACCENT);
+        border.setTitleFont(new Font("SansSerif",Font.BOLD,12));
+        panel.setBorder(BorderFactory.createCompoundBorder(border,
+                BorderFactory.createEmptyBorder(8,8,8,8)));
+        for (JPanel row : rows) panel.add(row);
+        panel.setMaximumSize(new Dimension(Integer.MAX_VALUE,panel.getPreferredSize().height));
+        return panel;
+    }
     private static JPanel line(Object... items) {
-        JPanel p=new JPanel(new FlowLayout(FlowLayout.LEFT,8,3));
-        for(Object item:items) p.add(item instanceof Component c?c:new JLabel(item.toString())); return p;
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT,6,4));
+        panel.setBackground(SURFACE);
+        for (Object item : items) {
+            Component component;
+            if (item instanceof Component) component = (Component)item;
+            else component = new JLabel(item.toString());
+            component.setForeground(TEXT);
+            if (component instanceof JCheckBox) component.setBackground(SURFACE);
+
+            if (component instanceof JComboBox) {
+                component.setBackground(SURFACE);
+                component.setForeground(TEXT);
+            }
+            panel.add(component);
+        }
+        return panel;
     }
     private JButton button(String text,Runnable action) {
-        JButton b=new JButton(text); b.addActionListener(e->{ try { action.run(); } catch(IllegalArgumentException ex) { message.setText(ex.getMessage()); } }); return b;
+        JButton b=new JButton(text);
+        b.setBackground(new Color(67,56,202));
+        b.setForeground(Color.WHITE);
+        b.setOpaque(true);
+        b.setContentAreaFilled(true);
+        b.setBorderPainted(false);
+        b.setFocusPainted(false);
+        b.setFont(new Font("SansSerif",Font.BOLD,12));
+        b.setBorder(BorderFactory.createEmptyBorder(9,12,9,12));
+        b.addActionListener(e->{ try { action.run(); } catch(IllegalArgumentException ex) { message.setText(ex.getMessage()); } }); return b;
     }
     private int value(JSpinner spinner) {
         try { spinner.commitEdit(); } catch(java.text.ParseException e) { throw new IllegalArgumentException("Введите целое число в допустимом диапазоне."); }
@@ -99,7 +209,7 @@ public final class MazeFrame extends JFrame {
     }
     private void move(Direction direction) {
         if(environment.finished()) return;
-        Environment.Transition t=environment.step(direction); agent.learn(t,direction);
+        Environment.Transition t=environment.step(direction); agent.observe(t);
         log.append(String.format("%s: (%d,%d) → (%d,%d), подкрепление %+.1f, сумма %.1f%n",direction,t.from().row()+1,t.from().col()+1,t.to().row()+1,t.to().col()+1,t.reward(),environment.total()));
         if(log.getLineCount()>100) { try { log.replaceRange("",0,log.getLineEndOffset(0)); } catch(javax.swing.text.BadLocationException ignored) { } }
         log.setCaretPosition(log.getDocument().getLength()); refresh();
