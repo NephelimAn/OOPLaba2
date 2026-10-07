@@ -44,7 +44,7 @@ public final class MazeFrame extends JFrame {
         sidebar.setLayout(new BoxLayout(sidebar, BoxLayout.Y_AXIS));
         sidebar.setBackground(BACKGROUND);
         sidebar.setBorder(BorderFactory.createEmptyBorder(16,16,16,16));
-        JLabel title = new JLabel("Mouse AI");
+        JLabel title = new JLabel("Mouse ");
         title.setForeground(TEXT);
         title.setAlignmentX(Component.LEFT_ALIGNMENT);
         title.setFont(new Font("SansSerif", Font.BOLD, 26));
