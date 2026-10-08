@@ -223,19 +223,18 @@ public final class MazeFrame extends JFrame {
         if(t.terminal()) { playback.stop(); message.setText("Сыр найден! Итоговый выигрыш: "+environment.total()); }
     }
     private void startPlayback() {
-        if(!reachable()) return; reset(); editing.setSelected(false); playback.start(); message.setText("Мышь исследует проходы по Q-оценкам с возвратом из тупиков; Стоп прерывает показ.");
+        if(!reachable()) return; reset(); editing.setSelected(false); playback.start(); message.setText("Мышь собирает выгодную воду и идёт к сыру; Стоп прерывает показ.");
     }
     private void autoStep() {
         if(training.isRunning()||environment.finished()) return;
         editing.setSelected(false);
-        Direction direction = navigator.choose(maze, agent, environment.position());
+        Direction direction = navigator.choose(maze, agent, environment.position(), environment.rewards());
         if (direction == null) {
             playback.stop();
             message.setText("Все доступные проходы проверены. Сыр недостижим.");
             return;
         }
         move(direction);
-        if(environment.steps()>=2*maze.rows()*maze.cols()&&!environment.finished()) { playback.stop(); message.setText("Достигнут лимит шагов. Продолжите обучение или измените лабиринт."); }
     }
     private int stepLimit() { return Math.min(10000,maze.rows()*maze.cols()*10); }
     private void startTraining() {
@@ -258,6 +257,7 @@ public final class MazeFrame extends JFrame {
                     routeEstimate.currentTotal(), routeEstimate.recommendedCheese(), routeEstimate.recommendedTotal())
                 : String.format("Маршрут уже даёт %+.0f очков. Минимальный Сыр +Z для плюса: %d.",
                     routeEstimate.currentTotal(), routeEstimate.recommendedCheese()));
+        if (!routeEstimate.optimal()) message.setText("Поле с циклами слишком велико для точного поиска: показ использует обход по Q-оценкам без гарантии максимума.");
         acceptRecommendation.setEnabled(needsIncrease && routeEstimate.recommendedCheese() <= 100000);
         if (needsIncrease && routeEstimate.recommendedCheese() > 100000)
             recommendation.setText("Для плюса нужно Сыр +Z = " + routeEstimate.recommendedCheese() + ". Уменьшите штраф за ток: лимит Z — 100000.");

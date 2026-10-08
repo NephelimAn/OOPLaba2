@@ -43,22 +43,21 @@ public final class QLearningAgent {
             resetEpisode();
             Environment trial = new Environment(maze, rewards);
             RouteNavigator route = new RouteNavigator();
-            int limit = 2 * maze.rows() * maze.cols();
-            while (!trial.finished() && trial.steps() < limit) {
-                Direction direction = route.choose(maze, this, trial.position());
+            while (!trial.finished()) {
+                Direction direction = route.choose(maze, this, trial.position(), rewards);
                 if (direction == null) break;
                 observe(trial.step(direction));
             }
             if (!trial.finished()) throw new IllegalArgumentException("Не удалось построить маршрут до сыра.");
             double withoutCheese = trial.total() - rewards.cheese();
             long recommended = (long)Math.max(Math.floor(rewards.water()) + 1, Math.floor(-withoutCheese) + 1);
-            return new RouteEstimate(trial.total(), recommended, withoutCheese + recommended, trial.steps());
+            return new RouteEstimate(trial.total(), recommended, withoutCheese + recommended, trial.steps(), route.optimal());
         } finally {
             consumed.clear();
             consumed.addAll(saved);
         }
     }
-    public record RouteEstimate(double currentTotal, long recommendedCheese, double recommendedTotal, int steps) { }
+    public record RouteEstimate(double currentTotal, long recommendedCheese, double recommendedTotal, int steps, boolean optimal) { }
     public boolean consumedWater(Position p) { return consumed.contains(p); }
     public int stateCount() { return table.size(); }
 }

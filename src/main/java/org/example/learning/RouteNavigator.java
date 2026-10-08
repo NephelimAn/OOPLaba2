@@ -3,18 +3,28 @@ package org.example.learning;
 import org.example.model.*;
 import java.util.*;
 
-/** Q-ranked DFS playback: explore each cell once and backtrack out of dead ends. */
+/** Maximize route reward where exact planning is supported; otherwise use Q-ranked DFS. */
 public final class RouteNavigator {
     private final Set<Position> visited = new HashSet<>();
     private final Deque<Position> path = new ArrayDeque<>();
     private final Set<Position> useful = new HashSet<>();
+    private Deque<Direction> optimalRoute;
+    private Position expectedPosition;
 
     public void reset() {
         visited.clear();
         path.clear();
         useful.clear();
+        optimalRoute = null;
+        expectedPosition = null;
     }
 
+    public boolean optimal() { return optimalRoute != null; }
+    private Direction plannedStep(Position position) {
+        Direction direction = optimalRoute.pollFirst();
+        expectedPosition = direction == null ? position : position.move(direction);
+        return direction;
+    }
     /** Peel empty dead-end branches up to their junction, keeping reward cells and the origin. */
     private void retainUsefulPassages(Maze maze, QLearningAgent agent, Position origin) {
         Map<Position, Integer> degree = new HashMap<>();
@@ -48,11 +58,18 @@ public final class RouteNavigator {
     }
     /** Returns null when the reachable component has been fully explored. */
     public Direction choose(Maze maze, QLearningAgent agent, Position position) {
+        return choose(maze, agent, position, Rewards.defaults());
+    }
+    public Direction choose(Maze maze, QLearningAgent agent, Position position, Rewards rewards) {
+        if (optimalRoute != null && position.equals(expectedPosition)) return plannedStep(position);
         // A manual move starts a new traversal from the actual mouse position.
         if (path.isEmpty() || !path.peek().equals(position)) {
             reset();
             path.push(position);
             visited.add(position);
+            optimalRoute = TreeRoutePlanner.plan(maze, agent, rewards, position);
+            if (optimalRoute == null) optimalRoute = CyclicRoutePlanner.plan(maze, agent, rewards, position);
+            if (optimalRoute != null) return plannedStep(position);
             retainUsefulPassages(maze, agent, position);
         }
         Direction best = null;
