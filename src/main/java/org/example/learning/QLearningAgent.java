@@ -22,10 +22,12 @@ public final class QLearningAgent {
     public void learn(Environment.Transition t,Direction action) {
         double[] previous=values(state(t.from()));
         observe(t);
-        double future=t.terminal()?0:Arrays.stream(values(state(t.to()))).max().orElse(0);
-        // Slide 9: Qnew(s,a) = Qold(s,a) + alpha * (reward + gamma * max Q(s',a') - Qold(s,a)).
-        // Cheese is terminal: its future reward is zero.
-        int a=action.ordinal(); previous[a]+=ALPHA*(t.reward()+GAMMA*future-previous[a]);
+        double future=t.terminal()
+                ? 0
+                :Arrays.stream(values(state(t.to())))
+                .max().orElse(0);
+        int a=action.ordinal();
+        previous[a]+=ALPHA*(t.reward()+GAMMA*future-previous[a]);
     }
     /** Обновляет память о воде при показе маршрута, не изменяя оценки Q. */
     public void observe(Environment.Transition transition) {

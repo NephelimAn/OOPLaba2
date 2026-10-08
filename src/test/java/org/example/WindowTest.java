@@ -40,6 +40,29 @@ public class WindowTest {
         }
         return false;
     }
+    private org.example.model.Environment environment(MazeFrame frame) {
+        try {
+            java.lang.reflect.Field field = MazeFrame.class.getDeclaredField("environment");
+            field.setAccessible(true);
+            return (org.example.model.Environment)field.get(frame);
+        } catch (ReflectiveOperationException ex) { throw new AssertionError(ex); }
+    }
+    @Test public void aiControlsRequireCompletedTraining() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            MazeFrame frame = new MazeFrame();
+            try {
+                button(frame, "Шаг ИИ").doClick();
+                button(frame, "Показать маршрут").doClick();
+                assertEquals(0, environment(frame).steps());
+                assertTrue(containsText(frame, "Сначала нажмите «Обучить»"));
+                button(frame, "Обучить").doClick();
+                button(frame, "Стоп").doClick();
+                button(frame, "Шаг ИИ").doClick();
+                button(frame, "Показать маршрут").doClick();
+                assertEquals("Interrupted training must not unlock playback", 0, environment(frame).steps());
+            } finally { frame.dispose(); }
+        });
+    }
     @Test public void trainingCompletesWithoutBlockingEventThread() throws Exception {
         MazeFrame[] frames=new MazeFrame[1];
         SwingUtilities.invokeAndWait(()->{
@@ -53,6 +76,20 @@ public class WindowTest {
                 SwingUtilities.invokeAndWait(()->done[0]=containsText(frames[0],"Обучение завершено"));
             }
             assertTrue("Training must complete and leave EDT responsive",done[0]);
+            SwingUtilities.invokeAndWait(() -> {
+                MazeFrame frame = frames[0];
+                button(frame, "Шаг ИИ").doClick();
+                assertEquals("Completed training unlocks AI", 1, environment(frame).steps());
+                button(frame, "На старт").doClick();
+                button(frame, "Шаг ИИ").doClick();
+                assertEquals("Returning to start keeps training", 1, environment(frame).steps());
+                button(frame, "Применить награды").doClick();
+                button(frame, "Шаг ИИ").doClick();
+                assertEquals("Changing rewards requires new training", 0, environment(frame).steps());
+                button(frame, "Сгенерировать").doClick();
+                button(frame, "Показать маршрут").doClick();
+                assertEquals("New maze requires new training", 0, environment(frame).steps());
+            });
         } finally { SwingUtilities.invokeAndWait(()->frames[0].dispose()); }
     }
 }

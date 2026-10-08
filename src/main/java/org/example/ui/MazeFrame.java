@@ -35,6 +35,7 @@ public final class MazeFrame extends JFrame {
     private int trained,target,success,episodeSteps;
     private Environment trainingEnvironment;
     private boolean episodeActive;
+    private boolean trainingCompleted;
     public MazeFrame() {
         super("Мышь в лабиринте — ООП / Q-learning");
         setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
@@ -62,7 +63,7 @@ public final class MazeFrame extends JFrame {
                 line("Эпизоды",episodes),
                 line(button("Обучить",this::startTraining),button("Стоп",this::stop)),
                 line(button("Показать маршрут",this::startPlayback)),
-                line(button("Шаг ИИ",()->{ if(!training.isRunning()) { editing.setSelected(false); autoStep(); } }),button("На старт",this::reset)),
+                line(button("Шаг ИИ",()->{ if(!training.isRunning()) { autoStep(); } }),button("На старт",this::reset)),
                 line(button("↑",()->manual(Direction.UP)),button("←",()->manual(Direction.LEFT)),
                         button("↓",()->manual(Direction.DOWN)),button("→",()->manual(Direction.RIGHT)))));
         sidebar.add(Box.createVerticalGlue());
@@ -188,15 +189,15 @@ public final class MazeFrame extends JFrame {
     private void newMaze(boolean generate) {
         int r=value(rows),c=value(cols); Rewards reward=rewards(); stop();
         maze=generate?Maze.generate(r,c,new Random()):new Maze(r,c);
-        environment=new Environment(maze,reward); agent=new QLearningAgent(new Random()); navigator.reset(); clearRecommendation(); trained=0;
+        environment=new Environment(maze,reward); agent=new QLearningAgent(new Random()); navigator.reset(); clearRecommendation(); trained=0; trainingCompleted=false;
         log.setText(""); editing.setSelected(true); refresh(); message.setText("Выберите инструмент и нажмите на клетку. Для движения отключите редактирование.");
     }
     private void applyRewards() {
-        Rewards reward=rewards(); stop(); environment=new Environment(maze,reward); agent=new QLearningAgent(new Random()); navigator.reset(); clearRecommendation(); trained=0; log.setText(""); refresh(); message.setText("Награды применены, обучение сброшено.");
+        Rewards reward=rewards(); stop(); environment=new Environment(maze,reward); agent=new QLearningAgent(new Random()); navigator.reset(); clearRecommendation(); trained=0; trainingCompleted=false; log.setText(""); refresh(); message.setText("Награды применены, обучение сброшено.");
     }
     private void edit(Position p) {
         if(!editing.isSelected()||training.isRunning()||playback.isRunning()) return;
-        try { maze.set(p,(CellType)tool.getSelectedItem()); environment.reset(); agent=new QLearningAgent(new Random()); navigator.reset(); clearRecommendation(); trained=0; log.setText(""); refresh(); message.setText(maze.hasPath()?"Схема изменена. Обучение сброшено.":"Сыр недостижим: откройте проход."); }
+        try { maze.set(p,(CellType)tool.getSelectedItem()); environment.reset(); agent=new QLearningAgent(new Random()); navigator.reset(); clearRecommendation(); trained=0; trainingCompleted=false; log.setText(""); refresh(); message.setText(maze.hasPath()?"Схема изменена. Обучение сброшено.":"Сыр недостижим: откройте проход."); }
         catch(IllegalArgumentException e) { message.setText(e.getMessage()); }
     }
     private void refresh() {
@@ -222,10 +223,17 @@ public final class MazeFrame extends JFrame {
         log.setCaretPosition(log.getDocument().getLength()); refresh();
         if(t.terminal()) { playback.stop(); message.setText("Сыр найден! Итоговый выигрыш: "+environment.total()); }
     }
+    private boolean requireTraining() {
+        if (trainingCompleted) return true;
+        message.setText("Сначала нажмите «Обучить» и дождитесь завершения обучения.");
+        return false;
+    }
     private void startPlayback() {
+        if (!requireTraining()) return;
         if(!reachable()) return; reset(); editing.setSelected(false); playback.start(); message.setText("Мышь собирает выгодную воду и идёт к сыру; Стоп прерывает показ.");
     }
     private void autoStep() {
+        if (!requireTraining()) return;
         if(training.isRunning()||environment.finished()) return;
         editing.setSelected(false);
         Direction direction = navigator.choose(maze, agent, environment.position(), environment.rewards());
@@ -241,7 +249,7 @@ public final class MazeFrame extends JFrame {
         if(!reachable()) return; int count=value(episodes); Rewards reward=rewards(); stop(); target=count; success=0; episodeActive=false;
         trainingEnvironment=new Environment(maze,reward);
         // Reward changes invalidate the previous table and visible episode.
-        environment=new Environment(maze,reward); agent=new QLearningAgent(new Random()); navigator.reset(); clearRecommendation(); trained=0;
+        environment=new Environment(maze,reward); agent=new QLearningAgent(new Random()); navigator.reset(); clearRecommendation(); trained=0; trainingCompleted=false;
         editing.setSelected(false); log.setText(""); training.start(); refresh();
     }
     private void clearRecommendation() {
@@ -291,6 +299,6 @@ public final class MazeFrame extends JFrame {
             if(agent.stateCount()>100000) { training.stop(); agent.resetEpisode(); message.setText("Лимит 100 000 состояний: уменьшите число клеток воды или размер поля."); refresh(); return; }
         }
         refresh(); message.setText("Обучение: "+trained+" / "+target+", успешных эпизодов: "+success);
-        if(trained>=target) { training.stop(); agent.resetEpisode(); message.setText("Обучение завершено. Успешных эпизодов: "+success+" / "+target+". Нажмите «Показать маршрут»."); suggestReward(); }
+        if(trained>=target) { trainingCompleted=true; training.stop(); agent.resetEpisode(); message.setText("Обучение завершено. Успешных эпизодов: "+success+" / "+target+". Нажмите «Показать маршрут»."); suggestReward(); }
     }
 }
