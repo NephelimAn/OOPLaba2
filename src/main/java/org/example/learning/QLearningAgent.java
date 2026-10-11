@@ -8,8 +8,15 @@ public final class QLearningAgent {
     private record State(Position position,Set<Position> consumed) { }
     private final Map<State,double[]> table=new HashMap<>();
     private final Random random; private final Set<Position> consumed=new HashSet<>();
+    private final Map<State, Direction> episodePolicy = new HashMap<>();
+    private Map<State, Direction> bestPolicy = Map.of();
+    private double episodeReward;
+    private double bestReward = Double.NEGATIVE_INFINITY;
+    public boolean hasSuccessfulRoute() { return !bestPolicy.isEmpty(); }
+    public Direction learnedAction(Position p) { return bestPolicy.get(state(p)); }
+    public Set<Position> consumedCells() { return Set.copyOf(consumed); }
     public QLearningAgent(Random random) { this.random=random; }
-    public void resetEpisode() { consumed.clear(); }
+    public void resetEpisode() { consumed.clear(); episodePolicy.clear(); episodeReward=0; }
     private State state(Position p) { return new State(p,Set.copyOf(consumed)); }
     private double[] values(State s) { return table.computeIfAbsent(s,k->new double[4]); }
     public Direction choose(Position p,double epsilon) {
@@ -20,7 +27,10 @@ public final class QLearningAgent {
         return Direction.values()[ties[random.nextInt(count)]];
     }
     public void learn(Environment.Transition t,Direction action) {
-        double[] previous=values(state(t.from()));
+        State before = state(t.from());
+        episodePolicy.put(before, action);
+        episodeReward += t.reward();
+        double[] previous=values(before);
         observe(t);
         double future=t.terminal()
                 ? 0
@@ -28,6 +38,10 @@ public final class QLearningAgent {
                 .max().orElse(0);
         int a=action.ordinal();
         previous[a]+=ALPHA*(t.reward()+GAMMA*future-previous[a]);
+        if (t.terminal() && episodeReward > bestReward) {
+            bestReward = episodeReward;
+            bestPolicy = Map.copyOf(episodePolicy);
+        }
     }
     /** Обновляет память о воде при показе маршрута, не изменяя оценки Q. */
     public void observe(Environment.Transition transition) {
@@ -42,7 +56,7 @@ public final class QLearningAgent {
     public RouteEstimate estimateRoute(Maze maze, Rewards rewards) {
         Set<Position> saved = Set.copyOf(consumed);
         try {
-            resetEpisode();
+            consumed.clear();
             Environment trial = new Environment(maze, rewards);
             RouteNavigator route = new RouteNavigator();
             while (!trial.finished()) {
@@ -53,7 +67,7 @@ public final class QLearningAgent {
             if (!trial.finished()) throw new IllegalArgumentException("Не удалось построить маршрут до сыра.");
             double withoutCheese = trial.total() - rewards.cheese();
             long recommended = (long)Math.max(Math.floor(rewards.water()) + 1, Math.floor(-withoutCheese) + 1);
-            return new RouteEstimate(trial.total(), recommended, withoutCheese + recommended, trial.steps(), route.optimal());
+            return new RouteEstimate(trial.total(), recommended, withoutCheese + recommended, trial.steps(), false);
         } finally {
             consumed.clear();
             consumed.addAll(saved);

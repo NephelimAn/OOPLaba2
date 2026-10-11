@@ -27,7 +27,8 @@ public class MazeTest {
             agent.resetEpisode();
             double before = agent.qValue(maze.start(), Direction.UP);
             for (int step = 0; step < 1920 && !environment.finished(); step++) {
-                Direction action = agent.choose(environment.position(), 0);
+                Direction action = agent.learnedAction(environment.position());
+                assertNotNull("Playback requires a successful training episode", action);
                 agent.observe(environment.step(action));
             }
             assertTrue("Greedy route must reach cheese for seed " + seed, environment.finished());
@@ -35,7 +36,7 @@ public class MazeTest {
             assertEquals("Playback must not change Q", before, agent.qValue(maze.start(), Direction.UP), 0);
         }
     }
-    @Test public void dfsProducesConnectedTreeOfCorridorsOnOddEvenAndLargeBoards() {
+    @Test public void generatorProducesConnectedBranchedCorridorsWithAlternativeRoutes() {
         for(int[] size:new int[][]{{2,2},{2,9},{9,2},{12,16},{13,17},{200,200}}) {
             Maze m=Maze.generate(size[0],size[1],new Random(123));
             Set<Position> reached=new HashSet<>(); ArrayDeque<Position> stack=new ArrayDeque<>();
@@ -52,7 +53,28 @@ public class MazeTest {
                 if(m.passable(p.move(Direction.DOWN))) edges++;
             }
             assertEquals("All carved cells must be connected",vertices,reached.size());
-            assertEquals("DFS must carve a tree without cycles",vertices-1,edges);
+            assertTrue(edges >= vertices-1);
+            if (size[0] >= 12 && size[1] >= 12) assertTrue("Large layouts must have alternative routes", edges > vertices-1);
+        }
+    }
+    @Test public void generatedBoardsHaveJunctionsAndDoNotForceTourOfMostCells() {
+        for(int seed=0;seed<10;seed++) {
+            Maze maze=Maze.generate(20,30,new Random(seed));
+            java.util.Map<Position,Integer> distance=new java.util.HashMap<>();
+            ArrayDeque<Position> queue=new ArrayDeque<>();
+            distance.put(maze.start(),0); queue.add(maze.start());
+            int junctions=0;
+            while(!queue.isEmpty()) {
+                Position p=queue.remove(); int degree=0;
+                for(Direction d:Direction.values()) {
+                    Position n=p.move(d); if(!maze.passable(n)) continue;
+                    degree++;
+                    if(!distance.containsKey(n)) { distance.put(n,distance.get(p)+1); queue.add(n); }
+                }
+                if(degree>=3) junctions++;
+            }
+            assertTrue("Multiple real choices required",junctions>=10);
+            assertTrue("Cheese path must not force visiting most passages",distance.get(maze.cheese())<distance.size()/2);
         }
     }
     @Test public void qLearningUsesBellmanUpdateAndZeroFutureForTerminalStates() {

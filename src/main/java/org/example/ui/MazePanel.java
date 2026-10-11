@@ -6,7 +6,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.util.function.Consumer;
 
-/** Scrollable, zoomable board; vector drawings require no external images. */
+
 public final class MazePanel extends JPanel {
     private Maze maze;
     private Environment environment;
@@ -36,6 +36,7 @@ public final class MazePanel extends JPanel {
                     case SHOCK -> new Color(254,163,163); case START -> new Color(167,243,208);
                     case CHEESE -> new Color(253,224,71); default -> new Color(203,213,225);
                 });
+                if (environment.visited(p) && type != CellType.WALL) g.setColor(new Color(74, 222, 128));
                 g.fillRoundRect(x+1,y+1,cellSize-2,cellSize-2,6,6);
                 String mark=switch(type) { case START -> "S"; case CHEESE -> "C"; case SHOCK -> "!";
                     case WATER -> environment.consumed(p)?"·":"+"; default -> ""; };

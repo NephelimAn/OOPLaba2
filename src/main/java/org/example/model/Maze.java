@@ -39,32 +39,30 @@ public final class Maze {
         }
         return false;
     }
-    /** Randomized DFS with backtracking, as on slides 11–12.
-     * Logical vertices are two cells apart; the cell between them is a wall.
-     * An explicit stack avoids a stack overflow on large boards.
-     */
+    /** Growing-tree corridors with random active vertices and extra connections. */
     public static Maze generate(int rows,int cols,Random random) {
         Objects.requireNonNull(random);
         Maze m=new Maze(rows,cols);
         for(CellType[] row:m.cells) Arrays.fill(row,CellType.WALL);
         boolean[][] visited=new boolean[rows][cols];
-        ArrayDeque<Position> stack=new ArrayDeque<>();
-        stack.push(m.start);
+        List<Position> stack=new ArrayList<>();
+        stack.add(m.start);
         visited[m.start.row()][m.start.col()]=true;
         m.cells[m.start.row()][m.start.col()]=CellType.EMPTY;
         while(!stack.isEmpty()) {
-            Position current=stack.peek();
+            int index = random.nextDouble() < .25 ? stack.size()-1 : random.nextInt(stack.size());
+            Position current=stack.get(index);
             List<Position> neighbors=new ArrayList<>(4);
             for(Direction d:Direction.values()) {
                 Position next=current.move(d).move(d);
                 if(m.contains(next)&&!visited[next.row()][next.col()]) neighbors.add(next);
             }
-            if(neighbors.isEmpty()) { stack.pop(); continue; }
+            if(neighbors.isEmpty()) { stack.remove(index); continue; }
             Position next=neighbors.get(random.nextInt(neighbors.size()));
             m.cells[(current.row()+next.row())/2][(current.col()+next.col())/2]=CellType.EMPTY;
             m.cells[next.row()][next.col()]=CellType.EMPTY;
             visited[next.row()][next.col()]=true;
-            stack.push(next);
+            stack.add(next);
         }
         // On even dimensions the cheese lies outside the logical-vertex grid.
         // Attach it to the nearest carved vertex by a short boundary corridor.
@@ -72,6 +70,20 @@ public final class Maze {
         int rightVertex=((cols-1)/2)*2;
         for(int r=0;r<=topVertex;r++) m.cells[r][rightVertex]=CellType.EMPTY;
         for(int c=rightVertex;c<cols;c++) m.cells[0][c]=CellType.EMPTY;
+        // Join selected adjacent corridors to provide alternate routes without opening rooms.
+        List<Position> joins = new ArrayList<>();
+        for (int r=1;r<rows-1;r++) for(int c=1;c<cols-1;c++) {
+            if (m.cells[r][c] != CellType.WALL) continue;
+            boolean vertical = m.cells[r-1][c] != CellType.WALL && m.cells[r+1][c] != CellType.WALL;
+            boolean horizontal = m.cells[r][c-1] != CellType.WALL && m.cells[r][c+1] != CellType.WALL;
+            if (vertical != horizontal) joins.add(new Position(r,c));
+        }
+        Collections.shuffle(joins, random);
+        int openings = joins.isEmpty() ? 0 : Math.max(1, joins.size()/5);
+        for (int i=0;i<openings;i++) {
+            Position p=joins.get(i);
+            m.cells[p.row()][p.col()] = CellType.EMPTY;
+        }
         for(int r=0;r<rows;r++) for(int c=0;c<cols;c++) {
             if(m.cells[r][c]!=CellType.EMPTY) continue;
             Position p=new Position(r,c);

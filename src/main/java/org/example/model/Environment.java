@@ -5,9 +5,10 @@ public final class Environment {
     public record Transition(Position from,Position to,double reward,boolean terminal,boolean drankWater) { }
     private final Maze maze; private final Rewards rewards;
     private final Set<Position> consumed=new HashSet<>();
+    private final Set<Position> visited = new HashSet<>();
     private Position position; private double total; private int steps,drinks;
     public Environment(Maze maze,Rewards rewards) { this.maze=maze; this.rewards=rewards; reset(); }
-    public void reset() { position=maze.start(); total=0; steps=0; drinks=0; consumed.clear(); }
+    public void reset() { position=maze.start(); total=0; steps=0; drinks=0; consumed.clear(); visited.clear(); visited.add(position); }
     public Transition step(Direction d) {
         Position from=position;
         if(finished()) return new Transition(from,from,0,true,false);
@@ -19,9 +20,10 @@ public final class Environment {
             case WATER -> { if(consumed.add(next)) { reward=rewards.water(); drank=true; drinks++; } }
             default -> { }
         }
-        position=next; total+=reward; steps++;
+        position=next; visited.add(next); total+=reward; steps++;
         return new Transition(from,next,reward,finished(),drank);
     }
+    public boolean visited(Position p) { return visited.contains(p); }
     public Rewards rewards() { return rewards; }
     public Position position() { return position; }
     public double total() { return total; }

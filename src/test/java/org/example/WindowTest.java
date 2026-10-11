@@ -40,6 +40,36 @@ public class WindowTest {
         }
         return false;
     }
+    @Test public void completedTrainingWithoutSuccessCannotRevealRoute() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            MazeFrame frame = new MazeFrame();
+            try {
+                java.lang.reflect.Field completed = MazeFrame.class.getDeclaredField("trainingCompleted");
+                completed.setAccessible(true); completed.setBoolean(frame, true);
+                button(frame, "Показать маршрут").doClick();
+                button(frame, "Шаг ИИ").doClick();
+                assertEquals(0, environment(frame).steps());
+                assertTrue(containsText(frame, "сыр не найден ни разу"));
+            } catch (ReflectiveOperationException ex) { throw new AssertionError(ex); }
+            finally { frame.dispose(); }
+        });
+    }
+    @Test public void visitedCellsArePaintedGreenAndClearOnReset() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            org.example.model.Maze maze = new org.example.model.Maze(2,3);
+            org.example.model.Environment env = new org.example.model.Environment(maze,org.example.model.Rewards.defaults());
+            org.example.ui.MazePanel panel = new org.example.ui.MazePanel(p -> {});
+            panel.setSize(102,68); panel.show(maze,env);
+            env.step(org.example.model.Direction.UP);
+            env.step(org.example.model.Direction.RIGHT);
+            BufferedImage image = new BufferedImage(102,68,BufferedImage.TYPE_INT_RGB);
+            Graphics2D g=image.createGraphics(); panel.paint(g); g.dispose();
+            assertEquals(new Color(74,222,128).getRGB(),image.getRGB(5,5));
+            env.reset();
+            g=image.createGraphics(); panel.paint(g); g.dispose();
+            assertEquals(new Color(203,213,225).getRGB(),image.getRGB(5,5));
+        });
+    }
     private org.example.model.Environment environment(MazeFrame frame) {
         try {
             java.lang.reflect.Field field = MazeFrame.class.getDeclaredField("environment");

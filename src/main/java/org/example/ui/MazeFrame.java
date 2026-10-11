@@ -99,7 +99,7 @@ public final class MazeFrame extends JFrame {
         JScrollPane logScroll = new JScrollPane(log);
         logScroll.setBorder(BorderFactory.createLineBorder(BORDER));
         bottom.add(logScroll,BorderLayout.CENTER);
-        bottom.add(line("S: старт   C: сыр   +: вода   !: ток"),BorderLayout.SOUTH);
+        bottom.add(line("S: старт   C: сыр   +: вода   !: ток   Зелёный: посещено"),BorderLayout.SOUTH);
         workspace.add(bottom,BorderLayout.SOUTH);
         getContentPane().setBackground(BACKGROUND);
         add(sidebarScroll,BorderLayout.WEST);
@@ -224,13 +224,17 @@ public final class MazeFrame extends JFrame {
         if(t.terminal()) { playback.stop(); message.setText("Сыр найден! Итоговый выигрыш: "+environment.total()); }
     }
     private boolean requireTraining() {
-        if (trainingCompleted) return true;
+        if (trainingCompleted && agent.hasSuccessfulRoute()) return true;
+        if (trainingCompleted) {
+            message.setText("Во время обучения сыр не найден ни разу. Увеличьте число эпизодов и повторите обучение.");
+            return false;
+        }
         message.setText("Сначала нажмите «Обучить» и дождитесь завершения обучения.");
         return false;
     }
     private void startPlayback() {
         if (!requireTraining()) return;
-        if(!reachable()) return; reset(); editing.setSelected(false); playback.start(); message.setText("Мышь собирает выгодную воду и идёт к сыру; Стоп прерывает показ.");
+        if(!reachable()) return; reset(); editing.setSelected(false); playback.start(); message.setText("Показ лучшего маршрута, найденного во время обучения; Стоп прерывает показ.");
     }
     private void autoStep() {
         if (!requireTraining()) return;
@@ -239,7 +243,7 @@ public final class MazeFrame extends JFrame {
         Direction direction = navigator.choose(maze, agent, environment.position(), environment.rewards());
         if (direction == null) {
             playback.stop();
-            message.setText("Все доступные проходы проверены. Сыр недостижим.");
+            message.setText("Для этой ситуации нет выученного хода или стратегия зациклилась. Повторите обучение.");
             return;
         }
         move(direction);
@@ -258,6 +262,11 @@ public final class MazeFrame extends JFrame {
         acceptRecommendation.setEnabled(false);
     }
     private void suggestReward() {
+        if (!agent.hasSuccessfulRoute()) {
+            clearRecommendation();
+            recommendation.setText("Успешных маршрутов нет: рекомендация награды пока недоступна.");
+            return;
+        }
         routeEstimate = agent.estimateRoute(maze, environment.rewards());
         boolean needsIncrease = routeEstimate.currentTotal() <= 0;
         recommendation.setText(needsIncrease
@@ -265,7 +274,6 @@ public final class MazeFrame extends JFrame {
                     routeEstimate.currentTotal(), routeEstimate.recommendedCheese(), routeEstimate.recommendedTotal())
                 : String.format("Маршрут уже даёт %+.0f очков. Минимальный Сыр +Z для плюса: %d.",
                     routeEstimate.currentTotal(), routeEstimate.recommendedCheese()));
-        if (!routeEstimate.optimal()) message.setText("Поле с циклами слишком велико для точного поиска: показ использует обход по Q-оценкам без гарантии максимума.");
         acceptRecommendation.setEnabled(needsIncrease && routeEstimate.recommendedCheese() <= 100000);
         if (needsIncrease && routeEstimate.recommendedCheese() > 100000)
             recommendation.setText("Для плюса нужно Сыр +Z = " + routeEstimate.recommendedCheese() + ". Уменьшите штраф за ток: лимит Z — 100000.");
@@ -296,7 +304,7 @@ public final class MazeFrame extends JFrame {
             Direction d=agent.choose(trainingEnvironment.position(),epsilon);
             agent.learn(trainingEnvironment.step(d),d); episodeSteps++;
             if(trainingEnvironment.finished()||episodeSteps>=stepLimit()) { if(trainingEnvironment.finished()) success++; trained++; episodeActive=false; }
-            if(agent.stateCount()>100000) { training.stop(); agent.resetEpisode(); message.setText("Лимит 100 000 состояний: уменьшите число клеток воды или размер поля."); refresh(); return; }
+
         }
         refresh(); message.setText("Обучение: "+trained+" / "+target+", успешных эпизодов: "+success);
         if(trained>=target) { trainingCompleted=true; training.stop(); agent.resetEpisode(); message.setText("Обучение завершено. Успешных эпизодов: "+success+" / "+target+". Нажмите «Показать маршрут»."); suggestReward(); }
