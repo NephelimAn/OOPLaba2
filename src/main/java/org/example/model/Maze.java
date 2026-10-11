@@ -12,6 +12,14 @@ public final class Maze {
         cells[start.row()][start.col()] = CellType.START;
         cells[cheese.row()][cheese.col()] = CellType.CHEESE;
     }
+    /** Снимок схемы для фонового обучения: редактор не меняет его клетки. */
+    public Maze copy() {
+        Maze result = new Maze(rows(), cols());
+        for (int r = 0; r < rows(); r++) result.cells[r] = cells[r].clone();
+        result.start = start;
+        result.cheese = cheese;
+        return result;
+    }
     public int rows() { return cells.length; }
     public int cols() { return cells[0].length; }
     public Position start() { return start; }
@@ -38,6 +46,27 @@ public final class Maze {
             for(Direction d:Direction.values()) { Position n=p.move(d); if(passable(n)&&seen.add(n)) queue.push(n); }
         }
         return false;
+    }
+    /** Соединитель должен иметь ровно двух противоположных соседей
+     * и не создавать ни одного открытого квадрата 2×2. */
+    private static boolean canOpenConnector(Maze maze, Position p) {
+        int r = p.row(), c = p.col();
+        boolean up = maze.passable(p.move(Direction.UP));
+        boolean down = maze.passable(p.move(Direction.DOWN));
+        boolean left = maze.passable(p.move(Direction.LEFT));
+        boolean right = maze.passable(p.move(Direction.RIGHT));
+        if (!((up && down && !left && !right) || (left && right && !up && !down))) return false;
+        for (int top = r - 1; top <= r; top++) {
+            for (int col = c - 1; col <= c; col++) {
+                boolean square = true;
+                for (int y = top; y <= top + 1; y++) for (int x = col; x <= col + 1; x++) {
+                    if (y == r && x == c) continue;
+                    if (!maze.passable(new Position(y, x))) square = false;
+                }
+                if (square) return false;
+            }
+        }
+        return true;
     }
     /** Growing-tree corridors with random active vertices and extra connections. */
     public static Maze generate(int rows,int cols,Random random) {
@@ -82,7 +111,8 @@ public final class Maze {
         int openings = joins.isEmpty() ? 0 : Math.max(1, joins.size()/5);
         for (int i=0;i<openings;i++) {
             Position p=joins.get(i);
-            m.cells[p.row()][p.col()] = CellType.EMPTY;
+            // Проверяем уже изменённое поле, а не старый список кандидатов.
+            if (canOpenConnector(m, p)) m.cells[p.row()][p.col()] = CellType.EMPTY;
         }
         for(int r=0;r<rows;r++) for(int c=0;c<cols;c++) {
             if(m.cells[r][c]!=CellType.EMPTY) continue;

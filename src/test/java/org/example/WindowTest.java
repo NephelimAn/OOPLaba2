@@ -93,6 +93,34 @@ public class WindowTest {
             } finally { frame.dispose(); }
         });
     }
+    @Test public void eventThreadKeepsProcessingAndStopCancelsBackgroundTask() throws Exception {
+        MazeFrame[] frames=new MazeFrame[1];
+        Timer[] heartbeat=new Timer[1];
+        java.util.concurrent.CountDownLatch ticks=new java.util.concurrent.CountDownLatch(5);
+        SwingUtilities.invokeAndWait(() -> {
+            MazeFrame frame=new MazeFrame();frames[0]=frame;
+            try {
+                java.lang.reflect.Field episodes=MazeFrame.class.getDeclaredField("episodes");episodes.setAccessible(true);
+                ((JSpinner)episodes.get(frame)).setValue(20000);
+            } catch(ReflectiveOperationException ex){throw new AssertionError(ex);}
+            button(frame,"Обучить").doClick();
+            heartbeat[0]=new Timer(10,e->ticks.countDown());heartbeat[0].start();
+        });
+        try {
+            assertTrue("EDT must process timer events during training",ticks.await(2,java.util.concurrent.TimeUnit.SECONDS));
+            SwingUtilities.invokeAndWait(() -> {
+                try {
+                    java.lang.reflect.Field field=MazeFrame.class.getDeclaredField("trainingWorker");field.setAccessible(true);
+                    SwingWorker<?,?> worker=(SwingWorker<?,?>)field.get(frames[0]);
+                    assertNotNull("Long training is still active",worker);
+                    button(frames[0],"Стоп").doClick();
+                    assertTrue(worker.isCancelled());assertNull(field.get(frames[0]));
+                    button(frames[0],"Пустое поле").doClick();
+                    assertEquals(0,environment(frames[0]).steps());
+                } catch(ReflectiveOperationException ex){throw new AssertionError(ex);}
+            });
+        } finally { SwingUtilities.invokeAndWait(() -> {heartbeat[0].stop();frames[0].dispose();}); }
+    }
     @Test public void trainingCompletesWithoutBlockingEventThread() throws Exception {
         MazeFrame[] frames=new MazeFrame[1];
         SwingUtilities.invokeAndWait(()->{
